@@ -307,3 +307,17 @@ bc_greater_or_equal()
 {
     [ $(echo "$1 >= $2" | bc) = "1" ]
 }
+
+get_node()
+{
+    DISK="$1"
+    PARTITION="$2"
+
+    if [ `echo $DISK | grep ^nvme` ]; then
+        echo "${DISK}p${PARTITION}"
+    else
+        echo "${DISK}${PARTITION}"
+    fi
+
+    return 0
+}
