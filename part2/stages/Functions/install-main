@@ -385,7 +385,7 @@ mount_dom0()
     local ROOT="$1"
     local tmpfsopts="size=16M"
 
-    do_mount -o ro ${ROOT} ${DOM0_MOUNT}                   || return 1
+    do_mount -o rw ${ROOT} ${DOM0_MOUNT}                   || return 1
     do_mount -o bind /proc ${DOM0_MOUNT}/proc              || return 1
     do_mount -o bind /sys ${DOM0_MOUNT}/sys                || return 1
     do_mount -o bind /dev ${DOM0_MOUNT}/dev                || return 1
@@ -431,6 +431,7 @@ mount_config()
 
 install_bootloader_from_dom0fs()
 {
+    sed -i 's/\[0-9\]\*/p\\?[0-9]/' ${DOM0_MOUNT}/usr/share/xenclient/install-bootloader
     do_cmd chroot ${DOM0_MOUNT} \
            /usr/share/xenclient/install-bootloader "${LANGUAGE}" >&2 || {
         echo "Error installing the bootloader">&2

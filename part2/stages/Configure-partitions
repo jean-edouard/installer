@@ -33,7 +33,11 @@ scan_partitions()
 
     local N
     for N in 1 2 3 4 ; do
-        PRIMARY_PARTITIONS="${PRIMARY_PARTITIONS} ${TARGET_DISK}${N}"
+        if [ `echo $TARGET_DISK | grep nvme` ]; then
+            PRIMARY_PARTITIONS="${PRIMARY_PARTITIONS} ${TARGET_DISK}p${N}"
+        else
+            PRIMARY_PARTITIONS="${PRIMARY_PARTITIONS} ${TARGET_DISK}${N}"
+        fi
     done
 
     EXISTING_PARTITIONS=
@@ -121,7 +125,7 @@ is_oem_partition()
 get_partition_type()
 {
     local PARTITION="$1"
-    local DISK=$(echo "${PARTITION}" | sed 's/[0-9]*$//')
+    local DISK=$(echo "${PARTITION}" | sed 's/p\?[0-9]$//')
 
     fdisk -ul "/dev/${DISK}" |
         grep "^/dev/${PARTITION} " |
@@ -139,8 +143,8 @@ get_vg_name()
 disk_has_free_space()
 {
     local PARTITION="$1"
-    local DISK=$(echo "${PARTITION}" | sed 's/[0-9]*$//')
-    local PARTITION_NUM=$(echo "${PARTITION}" | sed 's/^.*[a-z]//')
+    local DISK=$(echo "${PARTITION}" | sed 's/p\?[0-9]$//')
+    local PARTITION_NUM=$(echo "${PARTITION}" | sed 's/^.*\([0-9]\)$/\1/')
 
     # Try creating primary partition, but don't write changes to disk.
     OUTPUT=$(fdisk -u "/dev/${DISK}" <<EOF 2>&1
@@ -159,11 +163,11 @@ EOF
 
     # Will partition be large enough?
     FIRST_SECTOR=$(echo "${OUTPUT}" |
-                   grep "^/dev/${PARTITION}" |
+                   grep "^/dev/${DISK}p\?${PARTITION_NUM}" |
                    awk '{print $2}')
 
     LAST_SECTOR=$(echo "${OUTPUT}" |
-                  grep "^/dev/${PARTITION}" |
+                  grep "^/dev/${DISK}p\?${PARTITION_NUM}" |
                   awk '{print $3}')
 
     if [ -z "${FIRST_SECTOR}" -o -z "${LAST_SECTOR}" ] ; then
