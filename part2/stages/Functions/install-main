@@ -17,6 +17,33 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+create_ext4_partition() {
+    # Variable names here imply this is only for secondary disks, although there is nothing that restricts it in that manner
+    local SECONDARY_DISK=$1
+    local SECONDARY_DISK_DEV="/dev/${SECONDARY_DISK}"
+
+    do_cmd fdisk -u "${SECONDARY_DISK_DEV}" <<EOF >&2
+n
+p
+1
+
+
+w
+EOF
+
+    # Don't like the way I refer to /dev/sd*1 here, should be made more clear
+    do_cmd mkfs.ext4 -N 65536 -q "${SECONDARY_DISK_DEV}"1        >&2 || return 1
+    do_cmd tune2fs -i 0 -c -1 -m 0 "${SECONDARY_DISK_DEV}"1      >&2 || return 1
+}
+
+format_secondary_disks() {
+    local SECONDARIES=$1
+
+    for SECONDARY_DISK in ${SECONDARIES} ; do
+        create_ext4_partition ${SECONDARY_DISK}
+    done
+}
+
 create_lv() {
     local dfl_opts="--zero y"
     local vg=$1
@@ -67,6 +94,10 @@ apply_xc_packages()
                 case "${APPLY_MODE}" in
                     install)
                         install_dom0 "${PACKAGE_FILE}" "${PACKAGE_TYPE}"
+                        # Only do secondary disk stuff if secondary disks were discovered
+                        if [ -n "${SECONDARY_DISKS}" ] ; then
+                            format_secondary_disks "${SECONDARY_DISKS}"
+                        fi
                         ;;
                     upgrade)
                         upgrade_dom0 "${PACKAGE_FILE}" "${PACKAGE_TYPE}"

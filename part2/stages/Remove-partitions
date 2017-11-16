@@ -61,4 +61,11 @@ do_cmd dd if=/dev/zero of=/dev/${TARGET_DISK} bs=512 count=1 >&2
 do_cmd vgchange -a n >&2 || exit ${Abort}
 do_cmd hdparm -z /dev/${TARGET_DISK} >&2
 
+if [ -n "${SECONDARY_DISKS}" ] ; then
+    for DISK in ${SECONDARY_DISKS} ; do
+        do_cmd dd if=/dev/zero of=/dev/${DISK} bs=512 count=1 >&2
+        do_cmd hdparm -z /dev/${DISK} >&2
+    done
+fi
+
 exit ${Continue}

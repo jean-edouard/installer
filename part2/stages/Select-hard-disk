@@ -32,10 +32,26 @@ check_disk_size()
 }
 
 if answerfile_specifies "primary-disk" ; then
-    DISK=$(read_xml_tag "${ANSWERFILE}" "primary-disk")
-    [ ! -z "${DISK}" ] || exit ${Abort}
-    [ -b "/dev/${DISK}" ] || exit ${Abort}
-    check_disk_size "${DISK}" || exit ${Abort}
+    DISKS=$(read_xml_tag "${ANSWERFILE}" "primary-disk")
+
+    [ ! -z "${DISKS}" ] || exit ${Abort}
+
+	DISKFOUND=""
+
+    # Search through list of specified primary disks exiting when a valid one is found
+    for DISK in ${DISKS} ; do
+        [ -b "/dev/${DISK}" ] || continue
+        check_disk_size "${DISK}" || continue
+
+		DISKFOUND="1"
+		break
+    done
+
+    # Abort if no suitable disk is found
+    [ ! -z "${DISKFOUND}" ] || exit ${Abort}
+
+    # Capture ALL disks, not just those in the answer file so that secondary disks can be captured
+    DISKS=$(ls /sys/block | egrep -v '(^dm-|^loop|^ram|^sr|^scd|^tapdev|^td)')
 else
 
     # Step 1: get the list of available hard disks
@@ -113,12 +129,20 @@ controller is set up to use AHCI mode.
             # Read the selection
             DISK=$(cat ${CAPTURE} 2>/dev/null)
             rm -f ${CAPTURE}
-	fi
+        fi
         ;;
 
     esac
 fi
 
+SECONDARY_DISKS=""
+for SECONDARY in ${DISKS}; do
+    if [ "${SECONDARY}" != "${DISK}" ] ; then
+        SECONDARY_DISKS="${SECONDARY_DISKS}${SECONDARY_DISKS:+ }'${SECONDARY}'"
+    fi
+done
+
 echo "TARGET_DISK='${DISK}'" >${DISK_CONF}
+echo "SECONDARY_DISKS=${SECONDARY_DISKS}" >>${DISK_CONF}
 
 exit ${Continue}
