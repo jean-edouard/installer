@@ -25,6 +25,8 @@
 mk_xc_partition_layout()
 {
     deactivate_lvm             || return 1
+    remove_existing_partitions || return 1
+    create_bios_boot_partition || return 1
     create_xc_partition        || return 1
     return 0
 }
@@ -40,6 +42,53 @@ deactivate_lvm()
     return 0
 }
 
+remove_existing_partitions()
+{
+    if [ "${REMOVE_PARTITIONS}" ] ; then
+        mixedgauge "Removing disk partitions..." 5
+
+        for PARTITION in ${REMOVE_PARTITIONS} ; do
+            local DISK=$(get_partition_disk "${PARTITION}")
+            local PARTITION_NUM=$(get_partition_number "${PARTITION}")
+            local NODE=$(get_partition_node "${PARTITION}")
+            local DISK_DEV="/dev/${DISK}"
+            local PARTITION_DEV="/dev/${NODE}"
+
+            # Ignore errors returned by pvremove here as there may not
+            # actually be any LVM state to remove. Any important failures
+            # here will also cause the later creation commands to fail, so
+            # handle errors there.
+            do_cmd pvremove -ff -y "${PARTITION_DEV}" >&2
+            do_cmd sgdisk -d "${PARTITION_NUM}" "${DISK_DEV}" >&2
+        done
+
+		#Sync disk after removing the partitions
+		do_cmd sync
+    fi
+    return 0
+}
+
+# GRUB Stage 1.5 lives in the BIOS Boot Partition
+# GRUB2 will automatically find this partition when grub is installed
+create_bios_boot_partition()
+{
+    local PARTITION="${XC_PARTITION}"
+    local DISK=$(get_partition_disk "${PARTITION}")
+    local DISK_DEV="/dev/${DISK}"
+
+    local BBP_PARTNUM="1"
+    local BBP_SIZE="+1M"  # 1 MiB
+    local BBP_TYPE="EF02" # BIOS Boot Partition Typecode
+
+    # Delete the current partition tables and initialize new GPT table
+    do_cmd sgdisk -Z -g "${DISK_DEV}" >&2
+
+    # Create the BBP
+    do_cmd sgdisk -n ${BBP_PARTNUM}::${BBP_SIZE} -t ${BBP_PARTNUM}:${BBP_TYPE} "${DISK_DEV}" >&2
+
+    return 0
+}
+
 create_xc_partition()
 {
     local PARTITION="${XC_PARTITION}"
@@ -48,31 +97,23 @@ create_xc_partition()
     local NODE=$(get_partition_node "${PARTITION}")
     local DISK_DEV="/dev/${DISK}"
     local PARTITION_DEV="/dev/${NODE}"
+    local BOOT_FLAG_BIT="2"
 
     if [ "${CREATE_XC_PARTITION}" = "true" ] ; then
         mixedgauge "Creating ${PRODUCT_BRAND} disk partition..." 10
-
-        do_cmd fdisk -u "${DISK_DEV}" <<EOF >&2
-n
-p
-${PARTITION_NUM}
-
-
-w
-EOF
-
-        realign_xc_partition
+        do_cmd sgdisk -N ${PARTITION_NUM} -t ${PARTITION_NUM}:${XC_PARTITION_TYPE} "${DISK_DEV}" >&2
+  	    realign_xc_partition
     fi
 
-    do_cmd sfdisk -f "${DISK_DEV}" -N "${PARTITION_NUM}" <<EOF >&2
-,,${XC_PARTITION_TYPE}
-EOF
-
     mixedgauge "Activating ${PRODUCT_BRAND} disk partition..." 15
-    do_cmd sfdisk -f -A "${DISK_DEV}" "${PARTITION_NUM}" >&2
+
+    # Set the legacy boot flag attribute
+    # This is likely not needed for a GPT-based disk, but a small portion of BIOS's will
+    # refuse to boot if it is not set
+    do_cmd sgdisk -A ${PARTITION_NUM}:set:${BOOT_FLAG_BIT} "${DISK_DEV}" >&2
 
     echo "New partition layout:" >&2
-    fdisk -lu "${DISK_DEV}" >&2
+    gdisk -l "${DISK_DEV}" >&2
 
     reread_partition_table "${DISK_DEV}" || return 1
 
@@ -91,7 +132,7 @@ reread_partition_table()
 
     while true ; do
         ATTEMPTS=$((ATTEMPTS + 1))
-        echo "w" | do_cmd fdisk "${DISK_DEV}" >&2 && break
+        echo -e "w\nY" | do_cmd gdisk "${DISK_DEV}" >&2 && break
 
         if [ "${ATTEMPTS}" -gt 30 ] ; then
             echo "ERROR: Unable to re-read partition table." >&2
@@ -117,8 +158,8 @@ realign_xc_partition()
     local DISK_DEV="/dev/${DISK}"
     local PARTITION_DEV="/dev/${NODE}"
 
-    FIRST_SECTOR=$(fdisk -lu "${DISK_DEV}" | sed 's/*//' |
-                   grep "^${PARTITION_DEV}" |
+    FIRST_SECTOR=$(gdisk -l "${DISK_DEV}" | sed 's/\s\+//' |
+                   grep "^${PARTITION_NUM} " |
                    awk '{print $2}')
 
     if [ -z "${FIRST_SECTOR}" ] ; then
@@ -134,12 +175,10 @@ realign_xc_partition()
         echo "Realigning ${PRODUCT_BRAND} partition: moving first sector" \
              "from {FIRST_SECTOR} to ${ALIGNED_FIRST_SECTOR}" >&2
 
-        do_cmd fdisk -u "${DISK_DEV}" <<EOF >&2
+        do_cmd gdisk "${DISK_DEV}" <<EOF >&2
 x
-b
-${PARTITION_NUM}
+l
 ${ALIGNED_FIRST_SECTOR}
-Y
 w
 EOF
     fi
