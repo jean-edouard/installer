@@ -26,7 +26,6 @@ mk_xc_partition_layout()
 {
     deactivate_lvm             || return 1
     remove_existing_partitions || return 1
-    create_bios_boot_partition || return 1
     create_xc_partition        || return 1
     return 0
 }
@@ -65,27 +64,6 @@ remove_existing_partitions()
 		#Sync disk after removing the partitions
 		do_cmd sync
     fi
-    return 0
-}
-
-# GRUB Stage 1.5 lives in the BIOS Boot Partition
-# GRUB2 will automatically find this partition when grub is installed
-create_bios_boot_partition()
-{
-    local PARTITION="${XC_PARTITION}"
-    local DISK=$(get_partition_disk "${PARTITION}")
-    local DISK_DEV="/dev/${DISK}"
-
-    local BBP_PARTNUM="1"
-    local BBP_SIZE="+1M"  # 1 MiB
-    local BBP_TYPE="EF02" # BIOS Boot Partition Typecode
-
-    # Delete the current partition tables and initialize new GPT table
-    do_cmd sgdisk -Z -g "${DISK_DEV}" >&2
-
-    # Create the BBP
-    do_cmd sgdisk -n ${BBP_PARTNUM}::${BBP_SIZE} -t ${BBP_PARTNUM}:${BBP_TYPE} "${DISK_DEV}" >&2
-
     return 0
 }
 

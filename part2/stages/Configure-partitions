@@ -30,14 +30,21 @@ scan_partitions()
     gdisk -l "/dev/${TARGET_DISK}" >&2
 
     PRIMARY_PARTITIONS=
-
-    local N
+    NUM_PARTITIONS=$(grep -c "${TARGET_DISK}[0-9]" /proc/partitions)
 
     # We don't want to list the first partition in our primary partitions as it
     # is reserved for our BIOS Boot Partition
-    for N in 2 3 4 ; do
+    N=2
+    while [ $N -lt $((NUM_PARTITIONS+1)) ] ; do
         PRIMARY_PARTITIONS="${PRIMARY_PARTITIONS} ${TARGET_DISK}/${N}"
+        N=$((N+1))
     done
+
+    # If we can't find any existing partitions, then the only one
+    # we care about is partition #2, our first real partition
+    if [ -z ${PRIMARY_PARTITIONS} ] ; then
+        PRIMARY_PARTITIONS="${TARGET_DISK}/2"
+    fi
 
     EXISTING_PARTITIONS=
     XC_PARTITION=
@@ -422,27 +429,32 @@ partition_mode_is_unique()
 write_partition_conf()
 {
     local PRESERVE_PARTITIONS=
+    local CREATE_BBP_PARTITION=
     local CREATE_XC_PARTITION=
     local REMOVE_PARTITIONS=
 
     case "${PARTITION_MODE}" in
         erase-entire-disk)
             PRESERVE_PARTITIONS=
+            CREATE_BBP_PARTITION=true
             CREATE_XC_PARTITION=true
             ;;
 
         erase-non-oem)
             PRESERVE_PARTITIONS="${OEM_PARTITIONS}"
+            CREATE_BBP_PARTITION=false
             CREATE_XC_PARTITION=true
             ;;
 
         use-free-space)
             PRESERVE_PARTITIONS="${EXISTING_PARTITIONS}"
+            CREATE_BBP_PARTITION=false
             CREATE_XC_PARTITION=true
             ;;
 
         overwrite)
             PRESERVE_PARTITIONS="${EXISTING_PARTITIONS}"
+            CREATE_BBP_PARTITION=false
             CREATE_XC_PARTITION=false
             ;;
 
@@ -471,6 +483,7 @@ write_partition_conf()
 
     echo "PARTITION_MODE='${PARTITION_MODE}'" > ${PARTITION_CONF}
     echo "REMOVE_PARTITIONS='${REMOVE_PARTITIONS}'" >> ${PARTITION_CONF}
+    echo "CREATE_BBP_PARTITION='${CREATE_BBP_PARTITION}'" >> ${PARTITION_CONF}
     echo "CREATE_XC_PARTITION='${CREATE_XC_PARTITION}'" >> ${PARTITION_CONF}
     echo "XC_PARTITION='${XC_PARTITION}'" >> ${PARTITION_CONF}
 }

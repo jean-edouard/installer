@@ -138,6 +138,8 @@ fi
 SECONDARY_DISKS=""
 for SECONDARY in ${DISKS}; do
     if [ "${SECONDARY}" != "${DISK}" ] ; then
+        # Make sure we filter out mounted disks for the live install case
+        { mount | grep -q "${SECONDARY}"; } && continue
         SECONDARY_DISKS="${SECONDARY_DISKS}${SECONDARY_DISKS:+ }${SECONDARY}"
     fi
 done

@@ -22,14 +22,7 @@ create_ext4_partition() {
     local SECONDARY_DISK=$1
     local SECONDARY_DISK_DEV="/dev/${SECONDARY_DISK}"
 
-    do_cmd fdisk -u "${SECONDARY_DISK_DEV}" <<EOF >&2
-n
-p
-1
-
-
-w
-EOF
+    do_cmd sgdisk -N 1 "${SECONDARY_DISK_DEV}" >&2
 
     # Don't like the way I refer to /dev/sd*1 here, should be made more clear
     do_cmd mkfs.ext4 -N 65536 -q "${SECONDARY_DISK_DEV}"1        >&2 || return 1
@@ -882,13 +875,13 @@ install_vhds_and_vms()
     return 0
 }
 
-write_disk_mbr()
+write_disk_gpt()
 {
-    if [ "${INSTALL_MBR}" = "true" ] ; then
-        mixedgauge "Updating MBR..." 95
+    if [ "${INSTALL_GPT}" = "true" ] ; then
+        mixedgauge "Updating GPT..." 95
         local DISK_DEV="/dev/${TARGET_DISK}"
-        if ! do_cmd dd "if=${MBR_BINARY}" "of=${DISK_DEV}" >&2 ; then
-            echo "ERROR: Failure installing the disk MBR: aborting.">&2
+        if ! do_cmd sgdisk -g "${DISK_DEV}" >&2 ; then
+            echo "ERROR: Failure installing the disk GPT: aborting.">&2
             return 1
         fi
     fi
