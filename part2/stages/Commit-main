@@ -19,7 +19,9 @@
 
 . ${SCRIPT_DIR}/functions
 . ${SCRIPT_DIR}/Functions/install-main
-
+. ${DISK_CONF}
+. ${PARTITION_CONF}
+. ${GPT_CONF}
 . ${INSTALL_MODE_CONF}
 # ^^^ defines INSTALL_MODE
 

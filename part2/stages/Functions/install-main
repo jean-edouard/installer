@@ -24,9 +24,9 @@ create_ext4_partition() {
 
     do_cmd sgdisk -N 1 "${SECONDARY_DISK_DEV}" >&2
 
-    # Don't like the way I refer to /dev/sd*1 here, should be made more clear
-    do_cmd mkfs.ext4 -N 65536 -q "${SECONDARY_DISK_DEV}"1        >&2 || return 1
-    do_cmd tune2fs -i 0 -c -1 -m 0 "${SECONDARY_DISK_DEV}"1      >&2 || return 1
+    # Don't like the way I refer to /dev/sd*3 here, should be made more clear
+    do_cmd mkfs.ext4 -N 65536 -q "${SECONDARY_DISK_DEV}"3        >&2 || return 1
+    do_cmd tune2fs -i 0 -c -1 -m 0 "${SECONDARY_DISK_DEV}"3      >&2 || return 1
 }
 
 format_secondary_disks() {
@@ -412,7 +412,8 @@ commit_dom0()
 
     do_cmd mkdir -p ${DOM0_MOUNT}/storage/disks || return 1
 
-    install_bootloader_from_dom0fs || return 1
+    setup_efi || return 1
+    #install_bootloader_from_dom0fs || return 1
 
     mixedgauge "Taking ownership of TPM" 50
 
@@ -552,6 +553,72 @@ install_bootloader_from_dom0fs()
         echo "Error installing the bootloader">&2
         return 1
     }
+    return 0
+}
+
+setup_efi()
+{
+    local DISK_DEV="/dev/${TARGET_DISK}"
+    local ESP=$(sfdisk -l $1 2>/dev/null | grep "EFI System" | awk '{print $1}')
+    if [ -z ${ESP} ]; then
+        echo "No EFI System Partition on disk ${DISK_DEV}"
+        return 1
+    fi
+
+    do_mount ${ESP} ${ESP_MOUNT} 2> /dev/null
+    if [ "$?" != "0" ]; then
+        echo "Couldn't mount ${ESP}, already mounted?"
+        return 1
+    fi
+
+    do_cmd mkdir -p ${ESP_MOUNT}/EFI/openxt
+    do_cmd cp -f ${DOM0_MOUNT}/boot/xen.efi \
+          ${DOM0_MOUNT}/boot/shimx64.efi \
+          ${DOM0_MOUNT}/boot/bzImage \
+          ${DOM0_MOUNT}/boot/initramfs.gz \
+          ${DOM0_MOUNT}/boot/microcode_intel.bin \
+          ${DOM0_MOUNT}/etc/xen/xenrefpolicy/policy/policy.24 \
+          ${DOM0_MOUNT}/usr/share/xenclient/bootloader/openxt.cfg \
+          ${ESP_MOUNT}/EFI/openxt
+
+    if [ "$?" != "0" ]; then
+        echo "Failed to copy files to ESP"
+        do_cmd umount ${ESP_MOUNT}
+        return 1
+    fi
+
+    do_cmd umount ${ESP_MOUNT}
+
+    do_cmd efibootmgr -w -L "OpenXT" -l "\EFI\openxt\shimx64.efi" -c -d ${DISK_DEV} --part 1
+    if [ "$?" != "0" ]; then
+        echo "Couldn't create EFI boot entry"
+        return 1
+    fi
+
+    do_cmd efibootmgr -w -L "OpenXT (safe graphics)" -l "\EFI\openxt\shimx64.efi" -C -d ${DISK_DEV} --part 1 -u "openxt-support-safe-graphics"
+    if [ "$?" != "0" ]; then
+        echo "Couldn't create EFI boot entry"
+        return 1
+    fi
+
+    do_cmd efibootmgr -w -L "OpenXT (AMT)" -l "\EFI\openxt\shimx64.efi" -C -d ${DISK_DEV} --part 1 -u "openxt-support-amt"
+    if [ "$?" != "0" ]; then
+        echo "Couldn't create EFI boot entry"
+        return 1
+    fi
+
+    do_cmd efibootmgr -w -L "OpenXT (console)" -l "\EFI\openxt\shimx64.efi" -C -d ${DISK_DEV} --part 1 -u "openxt-support-console"
+    if [ "$?" != "0" ]; then
+        echo "Couldn't create EFI boot entry"
+        return 1
+    fi
+
+    do_cmd efibootmgr -w -L "OpenXT (console AMT)" -l "\EFI\openxt\shimx64.efi" -C -d ${DISK_DEV} --part 1 -u "openxt-support-console-amt"
+    if [ "$?" != "0" ]; then
+        echo "Couldn't create EFI boot entry"
+        return 1
+    fi
+
     return 0
 }
 
