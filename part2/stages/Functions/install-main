@@ -444,51 +444,6 @@ commit_dom0()
     fi
 }
 
-seal_system() {
-    if [ "${INSTALL_MODE}" = "upgrade" ]; then
-        if [ "${EXISTING_MEASURED_STATE}" = "true" ]; then
-            mount_dom0 ${ROOT_DEV} ||
-                return 1
-
-            mount_config || {
-                echo "failed to mount config" >&2
-                do_umount ${DOM0_MOUNT}/boot/system
-                do_umount ${DOM0_MOUNT}/tmp
-                do_umount ${DOM0_MOUNT}/dev
-                do_umount ${DOM0_MOUNT}/sys
-                do_umount ${DOM0_MOUNT}
-                return 1
-            }
-
-            if is_mounted ${DOM0_MOUNT}/config ; then
-                echo "seal_system: /config is mounted, forward sealing key" >&2
-
-                /etc/init.d/trousers stop
-                chroot ${DOM0_MOUNT} /usr/sbin/seal-system -f -r ${ROOT_DEV}
-                /etc/init.d/trousers start
-
-                do_umount ${DOM0_MOUNT}/config
-                do_umount ${DOM0_MOUNT}/boot/system
-                do_umount ${DOM0_MOUNT}/tmp
-                do_umount ${DOM0_MOUNT}/dev
-                do_umount ${DOM0_MOUNT}/sys
-                do_umount ${DOM0_MOUNT}/proc
-                do_umount ${DOM0_MOUNT}
-
-                return 0
-            fi
-
-            do_umount ${DOM0_MOUNT}/boot/system
-            do_umount ${DOM0_MOUNT}/tmp
-            do_umount ${DOM0_MOUNT}/dev
-            do_umount ${DOM0_MOUNT}/sys
-            do_umount ${DOM0_MOUNT}/proc
-            do_umount ${DOM0_MOUNT}
-            return 1
-        fi
-    fi
-}
-
 mount_dom0()
 {
     local ROOT="$1"

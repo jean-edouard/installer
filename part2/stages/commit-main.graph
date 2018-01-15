@@ -7,7 +7,6 @@ Commit-main,                  Continue:Commit-preserved-data | Abort:Unexpected-
 Commit-preserved-data,        Continue:Post-commit-hook | Abort:Unexpected-failure
 Post-commit-hook,             Continue:Succeed | Abort:Unexpected-failure
 
-Succeed,                      Continue:Seal-upgrade
-Seal-upgrade,                 Continue:End{Continue} | Abort:Unexpected-failure
+Succeed,                      Continue:End{Continue}
 Fail,                         Continue:End{Abort}
 Unexpected-failure,           Continue:End{UnexpectedAbort}
