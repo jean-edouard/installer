@@ -32,12 +32,14 @@ else
     . ${TPM_FUNCS}
 fi
 
-MLE_FUNCS=/usr/lib/openxt/ml-functions
-if [ ! -f ${MLE_FUNCS} ]; then
-    echo "No ml-function library found at ${MLE_FUNCS}.  ABORT" >&2
-    exit ${Abort}
-else
-    . ${MLE_FUNCS}
+if [ ! -d /sys/firmware/efi/efivars ]; then
+    MLE_FUNCS=/usr/lib/openxt/ml-functions
+    if [ ! -f ${MLE_FUNCS} ]; then
+        echo "No ml-function library found at ${MLE_FUNCS}.  ABORT" >&2
+        exit ${Abort}
+    else
+        . ${MLE_FUNCS}
+    fi
 fi
 
 CHECK_MSG="Checking availability of TXT & TPM."
@@ -218,9 +220,11 @@ TPM_GAUGE=$((${TPM_GAUGE}+${TPM_GAUGE_STEP}))
 update_gauge "${CHECK_MSG}" ${TPM_GAUGE}
 log_tpm_attrs || exit ${Abort}
 
-TPM_GAUGE=$((${TPM_GAUGE}+${TPM_GAUGE_STEP}))
-update_gauge "${CHECK_MSG}" ${TPM_GAUGE}
-mle_success || exit ${TxtFail}
+if [ ! -d /sys/firmware/efi/efivars ]; then
+    TPM_GAUGE=$((${TPM_GAUGE}+${TPM_GAUGE_STEP}))
+    update_gauge "${CHECK_MSG}" ${TPM_GAUGE}
+    mle_success || exit ${TxtFail}
+fi
 
 TPM_GAUGE=$((${TPM_GAUGE}+${TPM_GAUGE_STEP}))
 update_gauge "${CHECK_MSG}" ${TPM_GAUGE}
