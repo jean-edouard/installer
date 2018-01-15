@@ -38,6 +38,10 @@ warning=0
 # Log the test results to this data file. Erase to reinitialise it here.
 rm -f "${HOST_CAPABILITY_CONF}"
 
+if [ -d /sys/firmware/efi/efivars ]; then
+    exit ${Continue}
+fi
+
 if check_vtx; then
     echo 'VTx="True"'  >>"${HOST_CAPABILITY_CONF}"
 
