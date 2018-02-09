@@ -44,10 +44,11 @@ create_lv() {
     shift 2
     local opts=$@
 
-    local version="$(lvcreate --version | sed -ne 's/\s\+LVM version:\s\+\([^0-9.]*\([0-9.]*\)\).*/\1/p')"
-    if version_ge ${version} "2.02.105"; then
-        dfl_opts="${dfl_opts} --wipesignatures y --yes"
-    fi
+    # TODO: broken
+    #local version="$(lvcreate --version | sed -ne 's/\s\+LVM version:\s\+\([^0-9.]*\([0-9.]*\)\).*/\1/p')"
+    #if version_ge ${version} "2.02.105"; then
+    #   dfl_opts="${dfl_opts} --wipesignatures y --yes"
+    #fi
 
     lvcreate ${dfl_opts} --name ${name} ${opts} ${vg}
 }
