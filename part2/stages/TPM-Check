@@ -25,11 +25,19 @@ if [ "${MEASURE_LAUNCH}" = "false" ]; then
 fi
 
 TPM_FUNCS=/usr/lib/tpm-scripts/tpm-functions
+KEY_FUNCS=/usr/lib/openxt/key-functions
 if [ ! -f ${TPM_FUNCS} ]; then
     echo "No tpm-function library found at ${TPM_FUNCS}.  ABORT" >&2
     exit ${Abort}
 else
     . ${TPM_FUNCS}
+fi
+
+if [ ! -f ${KEY_FUNCS} ]; then
+    echo "No key-functions library found at ${KEY_FUNCS}.  ABORT" >&2
+    exit ${Abort}
+else
+    . ${KEY_FUNCS}
 fi
 
 if [ ! -d /sys/firmware/efi/efivars ]; then
