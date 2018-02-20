@@ -530,6 +530,19 @@ setup_efi()
         return 1
     fi
 
+    # Don't install secondary boot options if firmware lacks support
+    # for EFI_BOOT_OPTION_SUPPORT_KEY (see UEFI spec 3.1.4 Boot Manager Capabilities)
+    local EFI_GLOBAL_VARIABLE="8be4df61-93ca-11d2-aa0d-00e098032b8c"
+    local BootOptionSupport=$(efivar -d -n "${EFI_GLOBAL_VARIABLE}-BootOptionSupport" 2>/dev/null | awk '{ print $1 }')
+
+    if [ -z ${BootOptionSupport} ]; then
+        return 0
+    fi
+
+    if [ $((${BootOptionSupport} & 1)) != 1 ]; then
+        return 0
+    fi
+
     do_cmd efibootmgr -w -L "OpenXT (safe graphics)" -l "\EFI\openxt\shimx64.efi" -C -d ${DISK_DEV} --part 1 -u "openxt-support-safe-graphics"
     if [ "$?" != "0" ]; then
         echo "Couldn't create EFI boot entry"
