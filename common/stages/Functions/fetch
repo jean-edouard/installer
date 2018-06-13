@@ -80,7 +80,7 @@ fetch_file_tftp()
     local TARGET_FILE="$2"
 
     local REMOTE_HOST=$(echo "${SOURCE_URL}" | \
-                        sed -ne 's,^tftp://\([^/]*\)/.*$,\1,p' )
+                        sed -e 's,^tftp://\([^/]*\)/.*$,\1,' )
     local REMOTE_LEAF=$(echo "${SOURCE_URL}" | \
                         sed -e 's,^tftp://[^/]*/,,g' )
 
